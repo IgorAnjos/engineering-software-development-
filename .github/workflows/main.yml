@@ -190,12 +190,52 @@ jobs:
         run: |
           curl -f http://localhost:5003/health || exit 1
           curl -f http://localhost:5004/health || exit 1
-          echo "✅ Serviços saudáveis"
+          echo "✅ Serviços backend saudáveis"
+      
+      - name: Build e servir aplicação Blazor WebAssembly
+        run: |
+          cd src/BankMore.Web
+          dotnet build --configuration Release
+          nohup dotnet run --configuration Release --no-build --urls "http://localhost:5000" > blazor.log 2>&1 &
+          echo $! > blazor.pid
+          sleep 15  # Aguardar Blazor iniciar
+      
+      - name: Verificar aplicação Blazor disponível
+        run: |
+          for i in {1..30}; do
+            if curl -f http://localhost:5000 > /dev/null 2>&1; then
+              echo "✅ Aplicação Blazor disponível"
+              exit 0
+            fi
+            echo "Aguardando Blazor... ($i/30)"
+            sleep 2
+          done
+          echo "❌ Timeout aguardando Blazor"
+          cat src/BankMore.Web/blazor.log
+          exit 1
       
       - name: Executar testes E2E
+        env:
+          WEB_BASE_URL: http://localhost:5000
         run: |
           cd tests/BankMore.Web.E2ETests
-          dotnet test --configuration Release --verbosity normal
+          dotnet test --configuration Release --verbosity normal --logger "console;verbosity=detailed"
+      
+      - name: Exibir logs em caso de falha
+        if: failure()
+        run: |
+          echo "=== Logs do Blazor ==="
+          cat src/BankMore.Web/blazor.log || echo "Arquivo de log não encontrado"
+          echo "=== Containers Docker ==="
+          docker compose ps
+          docker compose logs
+      
+      - name: Parar aplicação Blazor
+        if: always()
+        run: |
+          if [ -f src/BankMore.Web/blazor.pid ]; then
+            kill $(cat src/BankMore.Web/blazor.pid) || true
+          fi
       
       - name: Parar containers
         if: always()
