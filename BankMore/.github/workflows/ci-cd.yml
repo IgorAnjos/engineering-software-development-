@@ -34,7 +34,7 @@ jobs:
         run: dotnet build BankMore.sln --configuration Release --no-restore
       
       - name: Executar testes unitários
-        run: dotnet test tests/BankMore.ContaCorrente.Tests/BankMore.ContaCorrente.Tests.csproj --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+        run: dotnet test tests/BankMore.ContaCorrente.Tests/BankMore.ContaCorrente.Tests.csproj --configuration Release --verbosity normal --logger "trx;LogFileName=test-results.trx"
       
       - name: Publicar resultados dos testes
         uses: dorny/test-reporter@v1
@@ -48,7 +48,6 @@ jobs:
         run: |
           dotnet test tests/BankMore.ContaCorrente.Tests/BankMore.ContaCorrente.Tests.csproj \
             --configuration Release \
-            --no-build \
             --collect:"XPlat Code Coverage" \
             --results-directory ./coverage
       
