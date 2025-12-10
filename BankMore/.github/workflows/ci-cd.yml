@@ -206,25 +206,3 @@ jobs:
       - name: Notificar sucesso
         if: success()
         run: echo "✅ Deploy concluído com sucesso!"
-
-  # ===== JOB 6: Notificação Teams =====
-  notify-teams:
-    name: Notify Teams
-    runs-on: ubuntu-latest
-    needs: [build-and-test, docker-build]
-    if: always()
-    
-    steps:
-      - name: Enviar notificação para Teams
-        uses: aliencube/microsoft-teams-actions@v0.8.0
-        with:
-          webhook_uri: ${{ secrets.TEAMS_WEBHOOK_URL }}
-          title: 'CI/CD Pipeline - BankMore'
-          summary: 'Pipeline executado para branch ${{ github.ref }}'
-          text: |
-            **Status**: ${{ job.status }}
-            **Branch**: ${{ github.ref }}
-            **Commit**: ${{ github.sha }}
-            **Autor**: ${{ github.actor }}
-            **Mensagem**: ${{ github.event.head_commit.message }}
-          theme_color: ${{ job.status == 'success' && '00FF00' || 'FF0000' }}
