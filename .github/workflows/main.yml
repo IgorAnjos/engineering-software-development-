@@ -214,13 +214,6 @@ jobs:
           cat src/BankMore.Web/blazor.log
           exit 1
       
-      - name: Instalar Chrome para Selenium
-        run: |
-          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          echo "deb http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
-          sudo apt-get update
-          sudo apt-get install -y google-chrome-stable
-      
       - name: Executar testes E2E
         env:
           WEB_BASE_URL: http://localhost:5000
