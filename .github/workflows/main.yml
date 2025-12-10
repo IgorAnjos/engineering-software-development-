@@ -183,7 +183,7 @@ jobs:
       
       - name: Iniciar aplicação com Docker Compose
         run: |
-          docker-compose up -d
+          docker compose up -d
           sleep 30  # Aguardar serviços iniciarem
       
       - name: Verificar saúde dos serviços
@@ -199,7 +199,7 @@ jobs:
       
       - name: Parar containers
         if: always()
-        run: docker-compose down
+        run: docker compose down
 
   # ===== JOB 5: Deploy (Condicional) =====
   deploy:
