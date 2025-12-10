@@ -181,43 +181,92 @@ jobs:
         with:
           dotnet-version: ${{ env.DOTNET_VERSION }}
       
-      - name: Iniciar aplicação com Docker Compose
+      - name: Iniciar serviços de infraestrutura
         run: |
-          docker compose up -d
-          sleep 30  # Aguardar serviços iniciarem
+          docker compose up -d zookeeper kafka redis
+          echo "Aguardando infraestrutura iniciar..."
+          sleep 20
+      
+      - name: Iniciar APIs backend
+        run: |
+          docker compose up -d api-conta api-transferencia
+          echo "Aguardando APIs iniciarem..."
+          sleep 30
       
       - name: Verificar saúde dos serviços
         run: |
-          curl -f http://localhost:5003/health || exit 1
-          curl -f http://localhost:5004/health || exit 1
-          echo "✅ Serviços backend saudáveis"
+          echo "Verificando API Conta Corrente..."
+          for i in {1..30}; do
+            if curl -f http://localhost:5003/health > /dev/null 2>&1; then
+              echo "✅ API Conta Corrente respondendo"
+              break
+            fi
+            echo "Aguardando API Conta... ($i/30)"
+            sleep 2
+          done
+          
+          echo "Verificando API Transferência..."
+          for i in {1..30}; do
+            if curl -f http://localhost:5004/health > /dev/null 2>&1; then
+              echo "✅ API Transferência respondendo"
+              break
+            fi
+            echo "Aguardando API Transferência... ($i/30)"
+            sleep 2
+          done
+          
+          # Verificar se ambas responderam
+          curl -f http://localhost:5003/health || (echo "❌ API Conta Corrente falhou" && exit 1)
+          curl -f http://localhost:5004/health || (echo "❌ API Transferência falhou" && exit 1)
+          echo "✅ Todos os serviços backend saudáveis"
       
       - name: Build e servir aplicação Blazor WebAssembly
         run: |
           cd src/BankMore.Web
+          echo "Building Blazor application..."
           dotnet build --configuration Release
-          nohup dotnet run --configuration Release --no-build --urls "http://localhost:5000" > blazor.log 2>&1 &
-          echo $! > blazor.pid
-          sleep 15  # Aguardar Blazor iniciar
+          echo "Starting Blazor application..."
+          nohup dotnet run --configuration Release --no-build --urls "http://localhost:5000" > ../../blazor.log 2>&1 &
+          echo $! > ../../blazor.pid
+          sleep 10
       
       - name: Verificar aplicação Blazor disponível
         run: |
-          for i in {1..30}; do
-            if curl -f http://localhost:5000 > /dev/null 2>&1; then
-              echo "✅ Aplicação Blazor disponível"
+          echo "Aguardando Blazor estar disponível..."
+          for i in {1..40}; do
+            if curl -f -s http://localhost:5000 > /dev/null 2>&1; then
+              echo "✅ Aplicação Blazor disponível em http://localhost:5000"
               exit 0
             fi
-            echo "Aguardando Blazor... ($i/30)"
-            sleep 2
+            echo "Aguardando Blazor... ($i/40)"
+            sleep 3
           done
           echo "❌ Timeout aguardando Blazor"
-          cat src/BankMore.Web/blazor.log
+          echo "=== Logs do Blazor ==="
+          cat blazor.log || echo "Arquivo de log não encontrado"
+          echo "=== Status do processo ==="
+          if [ -f blazor.pid ]; then
+            ps -p $(cat blazor.pid) || echo "Processo não encontrado"
+          fi
           exit 1
       
       - name: Executar testes E2E
         env:
           WEB_BASE_URL: http://localhost:5000
         run: |
+          echo "Iniciando testes E2E..."
+          echo "Blazor URL: $WEB_BASE_URL"
+          echo "API Conta: http://localhost:5003"
+          echo "API Transferência: http://localhost:5004"
+          echo ""
+          echo "=== Testando conectividade ==="
+          curl -v http://localhost:5000 || true
+          echo ""
+          curl -v http://localhost:5003/health || true
+          echo ""
+          curl -v http://localhost:5004/health || true
+          echo ""
+          echo "=== Executando testes ==="
           cd tests/BankMore.Web.E2ETests
           dotnet test --configuration Release --verbosity normal --logger "console;verbosity=detailed"
       
@@ -225,16 +274,27 @@ jobs:
         if: failure()
         run: |
           echo "=== Logs do Blazor ==="
-          cat src/BankMore.Web/blazor.log || echo "Arquivo de log não encontrado"
-          echo "=== Containers Docker ==="
+          cat blazor.log || echo "Arquivo de log do Blazor não encontrado"
+          echo ""
+          echo "=== Status dos Containers Docker ==="
           docker compose ps
-          docker compose logs
+          echo ""
+          echo "=== Logs da API Conta Corrente ==="
+          docker compose logs api-conta --tail=100
+          echo ""
+          echo "=== Logs da API Transferência ==="
+          docker compose logs api-transferencia --tail=100
+          echo ""
+          echo "=== Logs do Kafka ==="
+          docker compose logs kafka --tail=50
       
       - name: Parar aplicação Blazor
         if: always()
         run: |
-          if [ -f src/BankMore.Web/blazor.pid ]; then
-            kill $(cat src/BankMore.Web/blazor.pid) || true
+          if [ -f blazor.pid ]; then
+            echo "Parando processo Blazor (PID: $(cat blazor.pid))"
+            kill $(cat blazor.pid) || true
+            rm blazor.pid
           fi
       
       - name: Parar containers
