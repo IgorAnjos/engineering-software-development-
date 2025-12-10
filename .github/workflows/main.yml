@@ -12,6 +12,10 @@ env:
   DOCKER_REGISTRY: ghcr.io
   IMAGE_PREFIX: ${{ github.repository_owner }}/bankmore
 
+defaults:
+  run:
+    working-directory: BankMore
+
 jobs:
   # ===== JOB 1: Build e Testes =====
   build-and-test:
