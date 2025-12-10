@@ -1,0 +1,109 @@
+﻿@using BankMore.Web.Services
+@inject AuthService AuthService
+@inject TokenService TokenService
+@inject NavigationManager NavigationManager
+@implements IDisposable
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">🏦 BankMore</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+    <nav class="nav flex-column">
+        @if (isAuthenticated)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Minha Conta
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="transferencias">
+                    <span class="bi bi-arrow-left-right" aria-hidden="true"></span> Transferências
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <a class="nav-link" href="#" @onclick="Logout" @onclick:preventDefault>
+                    <span class="bi bi-box-arrow-right" aria-hidden="true"></span> Sair
+                </a>
+            </div>
+        }
+        else
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="login">
+                    <span class="bi bi-box-arrow-in-right" aria-hidden="true"></span> Login
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="cadastro">
+                    <span class="bi bi-person-plus" aria-hidden="true"></span> Criar Conta
+                </NavLink>
+            </div>
+        }
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+    private bool isAuthenticated = false;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await TokenService.InitializeAsync();
+        CheckAuthenticationState();
+        
+        // Registra um listener para mudanças de navegação
+        NavigationManager.LocationChanged += OnLocationChanged;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            await TokenService.InitializeAsync();
+            var newAuthState = AuthService.IsAuthenticated();
+            if (newAuthState != isAuthenticated)
+            {
+                isAuthenticated = newAuthState;
+                StateHasChanged();
+            }
+        }
+    }
+
+    private void OnLocationChanged(object? sender, Microsoft.AspNetCore.Components.Routing.LocationChangedEventArgs e)
+    {
+        CheckAuthenticationState();
+        StateHasChanged();
+    }
+
+    private void CheckAuthenticationState()
+    {
+        isAuthenticated = AuthService.IsAuthenticated();
+    }
+
+    private void ToggleNavMenu()
+    {
+        collapseNavMenu = !collapseNavMenu;
+    }
+
+    private void Logout()
+    {
+        AuthService.Logout();
+        isAuthenticated = false;
+        StateHasChanged();
+    }
+
+    public void Dispose()
+    {
+        NavigationManager.LocationChanged -= OnLocationChanged;
+    }
+}
+

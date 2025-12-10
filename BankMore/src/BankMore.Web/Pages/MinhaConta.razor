@@ -1,0 +1,507 @@
+@page "/"
+@page "/conta"
+@using BankMore.Web.Models
+@using BankMore.Web.Services
+@inject ContaService ContaService
+@inject TokenService TokenService
+@inject AuthService AuthService
+@inject NavigationManager NavigationManager
+
+<PageTitle>Minha Conta - BankMore</PageTitle>
+
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <h2 class="mb-4">Minha Conta</h2>
+        </div>
+    </div>
+
+    @if (!isAuthenticated)
+    {
+        <div class="alert alert-warning" role="alert">
+            Você precisa estar autenticado para acessar esta página.
+            <a href="/login" class="alert-link">Fazer login</a>
+        </div>
+    }
+    else if (isLoading)
+    {
+        <div class="text-center">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Carregando...</span>
+            </div>
+        </div>
+    }
+    else if (conta != null)
+    {
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">Dados da Conta</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <strong>Número da Conta:</strong> @conta.NumeroContaCorrente
+                        </div>
+                        <div class="mb-3">
+                            <strong>Nome:</strong> @conta.Nome
+                        </div>
+                        <div class="mb-3">
+                            <strong>CPF:</strong> @FormatarCpf(conta.Cpf)
+                        </div>
+                        <div class="mb-3">
+                            <strong>Status:</strong> 
+                            <span class="badge @(conta.Ativo ? "bg-success" : "bg-danger")">
+                                @(conta.Ativo ? "Ativa" : "Inativa")
+                            </span>
+                        </div>
+                        <div class="mb-3">
+                            <strong>Data de Criação:</strong> @conta.DataCriacao.ToString("dd/MM/yyyy")
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 mb-4">
+                <div class="card shadow">
+                    <div class="card-header bg-success text-white">
+                        <h4 class="mb-0">Saldo Atual</h4>
+                    </div>
+                    <div class="card-body">
+                        @if (saldo != null)
+                        {
+                            <div class="text-center">
+                                <h2 class="display-4 @(saldo.Saldo >= 0 ? "text-success" : "text-danger")">
+                                    @saldo.Saldo.ToString("C", new System.Globalization.CultureInfo("pt-BR"))
+                                </h2>
+                                <small class="text-muted">
+                                    Atualizado em: @saldo.DataHoraConsulta
+                                </small>
+                            </div>
+                            <div class="mt-3 d-grid">
+                                <button class="btn btn-primary" @onclick="AtualizarSaldo">
+                                    Atualizar Saldo
+                                </button>
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <div class="card shadow mt-3">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0">Depósitos e Saques</h5>
+                    </div>
+                    <div class="card-body">
+                        <ul class="nav nav-tabs mb-3" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(tipoOperacao == 'C' ? "active" : "")" 
+                                        @onclick="() => SelecionarTipo('C')" 
+                                        type="button">
+                                    <i class="bi bi-plus-circle"></i> Depósito
+                                </button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link @(tipoOperacao == 'D' ? "active" : "")" 
+                                        @onclick="() => SelecionarTipo('D')" 
+                                        type="button">
+                                    <i class="bi bi-dash-circle"></i> Saque
+                                </button>
+                            </li>
+                        </ul>
+
+                        <EditForm Model="@movimentacaoRequest" OnValidSubmit="@AbrirConfirmacao">
+                            <div class="mb-3">
+                                <label class="form-label">Valor</label>
+                                <input class="form-control" 
+                                       value="@displayValorMovimentacao"
+                                       @oninput="OnValorMovimentacaoChanged"
+                                       placeholder="R$ 0,00" />
+                            </div>
+
+                            <div class="d-grid">
+                                <button type="submit" class="btn @(tipoOperacao == 'C' ? "btn-success" : "btn-warning")" disabled="@isProcessing">
+                                    @if (isProcessing)
+                                    {
+                                        <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                    }
+                                    @(tipoOperacao == 'C' ? "Depositar" : "Sacar")
+                                </button>
+                            </div>
+                        </EditForm>
+
+                        @if (!string.IsNullOrEmpty(movimentacaoMessage))
+                        {
+                            <div class="alert @(movimentacaoSuccess ? "alert-success" : "alert-danger") mt-3" role="alert">
+                                @movimentacaoMessage
+                            </div>
+                        }
+                    </div>
+                </div>
+
+                <!-- Modal de Confirmação -->
+                @if (showModalMovimentacao)
+                {
+                    <div class="modal fade show d-block" tabindex="-1" style="background-color: rgba(0,0,0,0.5);">
+                        <div class="modal-dialog modal-dialog-centered">
+                            <div class="modal-content">
+                                <div class="modal-header @(tipoOperacao == 'C' ? "bg-success" : "bg-warning")">
+                                    <h5 class="modal-title text-white">Confirmar @(tipoOperacao == 'C' ? "Depósito" : "Saque")</h5>
+                                    <button type="button" class="btn-close" @onclick="FecharModalMovimentacao"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p><strong>Você está prestes a realizar:</strong></p>
+                                    <ul class="list-unstyled">
+                                        <li><strong>Operação:</strong> @(tipoOperacao == 'C' ? "Depósito" : "Saque")</li>
+                                        <li><strong>Valor:</strong> @movimentacaoRequest.Valor.ToString("C", new System.Globalization.CultureInfo("pt-BR"))</li>
+                                    </ul>
+                                    
+                                    @if (!string.IsNullOrEmpty(senhaErroMovimentacao))
+                                    {
+                                        <div class="alert alert-danger" role="alert">
+                                            @senhaErroMovimentacao
+                                        </div>
+                                    }
+                                    
+                                    <div class="mb-3">
+                                        <label for="senhaConfirmacaoMov" class="form-label">Digite sua senha para confirmar:</label>
+                                        <input type="password" 
+                                               id="senhaConfirmacaoMov" 
+                                               class="form-control" 
+                                               @bind="senhaConfirmacaoMovimentacao"
+                                               placeholder="Senha"
+                                               @onkeypress="HandleKeyPressMovimentacao" />
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" @onclick="FecharModalMovimentacao">Cancelar</button>
+                                    <button type="button" class="btn @(tipoOperacao == 'C' ? "btn-success" : "btn-warning")" @onclick="ConfirmarMovimentacao" disabled="@isValidandoSenha">
+                                        @if (isValidandoSenha)
+                                        {
+                                            <span class="spinner-border spinner-border-sm me-2" role="status"></span>
+                                        }
+                                        Confirmar
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                }
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-header bg-secondary text-white d-flex justify-content-between align-items-center">
+                        <h4 class="mb-0">Extrato</h4>
+                        <button class="btn btn-light btn-sm" @onclick="@(() => CarregarMovimentos())">
+                            <i class="bi bi-arrow-clockwise"></i> Atualizar
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        @if (movimentos?.Items?.Any() == true)
+                        {
+                            <div class="table-responsive">
+                                <table class="table table-striped table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Data</th>
+                                            <th>Tipo</th>
+                                            <th>Valor</th>
+                                            <th>Saldo Anterior</th>
+                                            <th>Saldo Atualizado</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @foreach (var movimento in movimentos.Items)
+                                        {
+                                            <tr>
+                                                <td>@movimento.DataMovimento.ToString("dd/MM/yyyy HH:mm")</td>
+                                                <td>
+                                                    <span class="badge @(movimento.TipoMovimento == 'C' ? "bg-success" : "bg-danger")">
+                                                        @(movimento.TipoMovimento == 'C' ? "Crédito" : "Débito")
+                                                    </span>
+                                                </td>
+                                                <td class="@(movimento.TipoMovimento == 'C' ? "text-success" : "text-danger")">
+                                                    @movimento.Valor.ToString("C", new System.Globalization.CultureInfo("pt-BR"))
+                                                </td>
+                                                <td>@movimento.SaldoAnterior.ToString("C", new System.Globalization.CultureInfo("pt-BR"))</td>
+                                                <td><strong>@movimento.SaldoAtualizado.ToString("C", new System.Globalization.CultureInfo("pt-BR"))</strong></td>
+                                            </tr>
+                                        }
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            @if (movimentos.TotalPages > 1)
+                            {
+                                <nav>
+                                    <ul class="pagination justify-content-center">
+                                        <li class="page-item @(movimentos.HasPrevious ? "" : "disabled")">
+                                            <button class="page-link" @onclick="@(() => CarregarMovimentos(currentPage - 1))" disabled="@(!movimentos.HasPrevious)">
+                                                Anterior
+                                            </button>
+                                        </li>
+                                        <li class="page-item active">
+                                            <span class="page-link">Página @movimentos.Page de @movimentos.TotalPages</span>
+                                        </li>
+                                        <li class="page-item @(movimentos.HasNext ? "" : "disabled")">
+                                            <button class="page-link" @onclick="@(() => CarregarMovimentos(currentPage + 1))" disabled="@(!movimentos.HasNext)">
+                                                Próxima
+                                            </button>
+                                        </li>
+                                    </ul>
+                                </nav>
+                            }
+                        }
+                        else
+                        {
+                            <p class="text-muted text-center">Nenhuma movimentação encontrada.</p>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private bool isAuthenticated = false;
+    private bool isLoading = true;
+    private bool isProcessing = false;
+    private ContaDto? conta;
+    private SaldoDto? saldo;
+    private PaginatedList<MovimentoDto>? movimentos;
+    private MovimentacaoRequest movimentacaoRequest = new() { TipoMovimento = 'C' };
+    private string? movimentacaoMessage;
+    private bool movimentacaoSuccess = false;
+    private int currentPage = 1;
+    private char tipoOperacao = 'C';
+    private string displayValorMovimentacao = "";
+    private bool showModalMovimentacao = false;
+    private string senhaConfirmacaoMovimentacao = "";
+    private string senhaErroMovimentacao = "";
+    private bool isValidandoSenha = false;
+
+    private string FormatarCpf(string cpf)
+    {
+        if (string.IsNullOrEmpty(cpf)) return "";
+        var numeros = new string(cpf.Where(char.IsDigit).ToArray());
+        if (numeros.Length != 11) return cpf;
+        return $"{numeros.Substring(0, 3)}.{numeros.Substring(3, 3)}.{numeros.Substring(6, 3)}-{numeros.Substring(9, 2)}";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await TokenService.InitializeAsync();
+        isAuthenticated = AuthService.IsAuthenticated();
+
+        if (!isAuthenticated)
+        {
+            NavigationManager.NavigateTo("/login");
+            return;
+        }
+
+        await CarregarDadosConta();
+    }
+
+    private void SelecionarTipo(char tipo)
+    {
+        tipoOperacao = tipo;
+        movimentacaoRequest.TipoMovimento = tipo;
+        displayValorMovimentacao = "";
+        movimentacaoRequest.Valor = 0;
+        movimentacaoMessage = null;
+    }
+
+    private void OnValorMovimentacaoChanged(ChangeEventArgs e)
+    {
+        var input = e.Value?.ToString() ?? "";
+        var numeros = new string(input.Where(char.IsDigit).ToArray());
+
+        if (string.IsNullOrEmpty(numeros))
+        {
+            displayValorMovimentacao = "";
+            movimentacaoRequest.Valor = 0;
+            return;
+        }
+
+        if (decimal.TryParse(numeros, out var valor))
+        {
+            var valorDecimal = valor / 100;
+            movimentacaoRequest.Valor = valorDecimal;
+            displayValorMovimentacao = $"R$ {valorDecimal:N2}";
+        }
+    }
+
+    private void AbrirConfirmacao()
+    {
+        if (movimentacaoRequest.Valor <= 0)
+        {
+            movimentacaoMessage = "Informe um valor válido.";
+            movimentacaoSuccess = false;
+            return;
+        }
+
+        senhaConfirmacaoMovimentacao = "";
+        senhaErroMovimentacao = "";
+        showModalMovimentacao = true;
+    }
+
+    private void FecharModalMovimentacao()
+    {
+        showModalMovimentacao = false;
+        senhaConfirmacaoMovimentacao = "";
+        senhaErroMovimentacao = "";
+        isValidandoSenha = false;
+    }
+
+    private async Task HandleKeyPressMovimentacao(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await ConfirmarMovimentacao();
+        }
+    }
+
+    private async Task ConfirmarMovimentacao()
+    {
+        if (string.IsNullOrWhiteSpace(senhaConfirmacaoMovimentacao))
+        {
+            senhaErroMovimentacao = "Digite sua senha para confirmar.";
+            return;
+        }
+
+        isValidandoSenha = true;
+        senhaErroMovimentacao = "";
+
+        try
+        {
+            var numeroOuCpf = conta?.Cpf ?? "";
+            var validacaoResponse = await AuthService.ValidarSenhaAsync(numeroOuCpf, senhaConfirmacaoMovimentacao);
+
+            if (validacaoResponse.IsSuccessStatusCode)
+            {
+                FecharModalMovimentacao();
+                await CriarMovimentacao();
+            }
+            else
+            {
+                senhaErroMovimentacao = "Senha incorreta. Tente novamente.";
+            }
+        }
+        catch
+        {
+            senhaErroMovimentacao = "Erro ao validar senha. Tente novamente.";
+        }
+        finally
+        {
+            isValidandoSenha = false;
+        }
+    }
+
+    private async Task CarregarDadosConta()
+    {
+        isLoading = true;
+        try
+        {
+            var idConta = TokenService.GetIdConta();
+            if (!string.IsNullOrEmpty(idConta))
+            {
+                conta = await ContaService.ObterContaAsync(idConta);
+                saldo = await ContaService.ConsultarSaldoAsync(idConta);
+                await CarregarMovimentos();
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar dados: {ex.Message}");
+        }
+        finally
+        {
+            isLoading = false;
+        }
+    }
+
+    private async Task AtualizarSaldo()
+    {
+        try
+        {
+            var idConta = TokenService.GetIdConta();
+            if (!string.IsNullOrEmpty(idConta))
+            {
+                saldo = await ContaService.ConsultarSaldoAsync(idConta);
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao atualizar saldo: {ex.Message}");
+        }
+    }
+
+    private async Task CarregarMovimentos(int page = 1)
+    {
+        try
+        {
+            var idConta = TokenService.GetIdConta();
+            Console.WriteLine($"[DEBUG] CarregarMovimentos - idConta: {idConta}, page: {page}");
+            
+            if (!string.IsNullOrEmpty(idConta))
+            {
+                currentPage = page;
+                movimentos = await ContaService.ListarMovimentosAsync(idConta, page: currentPage);
+                Console.WriteLine($"[DEBUG] Movimentos carregados - Total: {movimentos?.TotalItems}, Items: {movimentos?.Items?.Count}");
+            }
+            else
+            {
+                Console.WriteLine("[DEBUG] idConta está vazio!");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"[ERRO] ao carregar movimentos: {ex.Message}");
+            Console.WriteLine($"[ERRO] StackTrace: {ex.StackTrace}");
+        }
+    }
+
+    private async Task CriarMovimentacao()
+    {
+        isProcessing = true;
+        movimentacaoMessage = null;
+
+        try
+        {
+            var idConta = TokenService.GetIdConta();
+            if (!string.IsNullOrEmpty(idConta))
+            {
+                movimentacaoRequest.ChaveIdempotencia = Guid.CreateVersion7().ToString();
+                var response = await ContaService.CriarMovimentoAsync(idConta, movimentacaoRequest);
+
+                if (response.IsSuccessStatusCode)
+                {
+                    movimentacaoSuccess = true;
+                    movimentacaoMessage = $"{(tipoOperacao == 'C' ? "Depósito" : "Saque")} realizado com sucesso!";
+                    displayValorMovimentacao = "";
+                    movimentacaoRequest = new() { TipoMovimento = tipoOperacao, Valor = 0 };
+                    
+                    await AtualizarSaldo();
+                    await CarregarMovimentos();
+                }
+                else
+                {
+                    movimentacaoSuccess = false;
+                    movimentacaoMessage = $"Erro ao realizar {(tipoOperacao == 'C' ? "depósito" : "saque")}.";
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            movimentacaoSuccess = false;
+            movimentacaoMessage = $"Erro: {ex.Message}";
+        }
+        finally
+        {
+            isProcessing = false;
+        }
+    }
+}
