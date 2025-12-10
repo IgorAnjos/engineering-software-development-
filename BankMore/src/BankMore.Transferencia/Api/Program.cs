@@ -147,6 +147,7 @@ builder.Services.AddTransient(sp => new RealizarTransferenciaHandler(
     sp.GetRequiredService<ICompensacaoPendenteRepository>(),
     sp.GetRequiredService<IContaCorrenteService>(),
     sp.GetRequiredService<IKafkaProducerService>(),
+    sp.GetRequiredService<ILogger<RealizarTransferenciaHandler>>(),
     sp.GetRequiredService<IConfiguration>()
 ));
 
