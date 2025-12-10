@@ -141,3 +141,5 @@ Exemplo: `1.2.3` = Major 1, Minor 2, Patch 3
 - [Repositório](https://github.com/bankmore/bankmore)
 - [Issues](https://github.com/bankmore/bankmore/issues)
 - [Releases](https://github.com/bankmore/bankmore/releases)
+
+## final
