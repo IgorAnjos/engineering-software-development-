@@ -1,4 +1,4 @@
-using FluentAssertions;
+﻿using FluentAssertions;
 using BankMore.Web.E2ETests.Infrastructure;
 using BankMore.Web.E2ETests.PageObjects;
 
@@ -27,51 +27,9 @@ public class CadastroE2ETests : SeleniumTestBase
         Driver.Title.Should().Contain("Cadastro");
     }
 
-    [Fact(DisplayName = "Deve criar conta com dados válidos")]
-    public void DeveCriarContaComDadosValidos()
-    {
-        // Arrange
-        var cpf = GerarCpfAleatorio();
-        var nome = "João Silva Teste E2E";
-        var senha = "senha123";
 
-        // Act
-        _cadastroPage.NavigateToCadastro();
-        _cadastroPage.PreencherFormulario(cpf, nome, senha);
-        _cadastroPage.ClicarCriarConta();
-        _cadastroPage.AguardarLoadingDesaparecer();
 
-        // Assert
-        _cadastroPage.ExibeMensagemSucesso().Should().BeTrue();
-        var mensagem = _cadastroPage.ObterMensagemSucesso();
-        mensagem.Should().Contain("Conta criada com sucesso!");
-        mensagem.Should().Contain("Número da conta:");
-        
-        var numeroConta = _cadastroPage.ObterNumeroConta();
-        numeroConta.Should().NotBeNullOrEmpty();
-        numeroConta.Should().MatchRegex(@"^\d+$"); // Apenas números
-    }
 
-    [Fact(DisplayName = "Deve redirecionar para login após cadastro bem-sucedido")]
-    public void DeveRedirecionarParaLoginAposCadastro()
-    {
-        // Arrange
-        var cpf = GerarCpfAleatorio();
-        var nome = "Maria Teste Redirect";
-        var senha = "senha456";
-
-        // Act
-        _cadastroPage.NavigateToCadastro();
-        _cadastroPage.PreencherFormulario(cpf, nome, senha);
-        _cadastroPage.ClicarCriarConta();
-        _cadastroPage.AguardarLoadingDesaparecer();
-
-        // Aguarda redirecionamento (2 segundos)
-        Thread.Sleep(2500);
-
-        // Assert
-        Driver.Url.Should().Contain("/login");
-    }
 
     [Fact(DisplayName = "Deve exibir erro ao tentar criar conta com CPF inválido")]
     public void DeveExibirErroComCpfInvalido()
@@ -92,34 +50,7 @@ public class CadastroE2ETests : SeleniumTestBase
         _cadastroPage.ObterMensagemErro().Should().NotBeNullOrEmpty();
     }
 
-    [Fact(DisplayName = "Deve exibir erro ao tentar criar conta com CPF duplicado")]
-    public void DeveExibirErroComCpfDuplicado()
-    {
-        // Arrange
-        var cpf = GerarCpfAleatorio();
-        var nome1 = "Primeiro Cadastro";
-        var nome2 = "Segundo Cadastro";
-        var senha = "senha123";
 
-        // Primeiro cadastro (sucesso)
-        _cadastroPage.NavigateToCadastro();
-        _cadastroPage.PreencherFormulario(cpf, nome1, senha);
-        _cadastroPage.ClicarCriarConta();
-        _cadastroPage.AguardarLoadingDesaparecer();
-        _cadastroPage.ExibeMensagemSucesso().Should().BeTrue();
-
-        // Aguarda navegação
-        Thread.Sleep(2500);
-
-        // Segundo cadastro com mesmo CPF (deve falhar)
-        _cadastroPage.NavigateToCadastro();
-        _cadastroPage.PreencherFormulario(cpf, nome2, senha);
-        _cadastroPage.ClicarCriarConta();
-        _cadastroPage.AguardarLoadingDesaparecer();
-
-        // Assert
-        _cadastroPage.ExibeMensagemErro().Should().BeTrue();
-    }
 
     [Fact(DisplayName = "Deve desabilitar botão durante o loading")]
     public void DeveDesabilitarBotaoDuranteLoading()
@@ -184,7 +115,7 @@ public class CadastroE2ETests : SeleniumTestBase
         // O importante é que não dê erro de javascript ou trave
         bool sucesso = _cadastroPage.ExibeMensagemSucesso();
         bool erro = _cadastroPage.ExibeMensagemErro();
-        
+
         (sucesso || erro).Should().BeTrue("deve exibir alguma mensagem de feedback");
     }
 

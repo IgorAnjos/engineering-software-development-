@@ -170,12 +170,19 @@ jobs:
         run: |
           curl -f http://localhost:5003/health || exit 1
           curl -f http://localhost:5004/health || exit 1
+          curl -f http://localhost:5000 || exit 1
           echo "✅ Serviços saudáveis"
+      
+      - name: Instalar Chrome para Selenium
+        run: |
+          wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
+          echo "deb http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update
+          sudo apt-get install -y google-chrome-stable
       
       - name: Executar testes E2E
         run: |
-          cd tests/BankMore.Web.E2ETests
-          dotnet test --configuration Release --verbosity normal
+          dotnet test tests/BankMore.Web.E2ETests/BankMore.Web.E2ETests.csproj --configuration Release --verbosity normal
       
       - name: Parar containers
         if: always()
