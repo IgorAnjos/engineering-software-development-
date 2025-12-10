@@ -47,6 +47,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BankMore.Tarifas", "src\Ban
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BankMore.Web", "src\BankMore.Web\BankMore.Web.csproj", "{506CA0C9-AAA5-4852-B43C-87B52FF7C87C}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "NewFolder1", "NewFolder1", "{2719E7F0-5FF6-4A0E-ABFF-C55C317C840D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BankMore.Web.E2ETests", "tests\BankMore.Web.E2ETests\BankMore.Web.E2ETests.csproj", "{D82733F6-5541-4733-97E7-162B246233DC}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -177,6 +181,18 @@ Global
 		{506CA0C9-AAA5-4852-B43C-87B52FF7C87C}.Release|x64.Build.0 = Release|Any CPU
 		{506CA0C9-AAA5-4852-B43C-87B52FF7C87C}.Release|x86.ActiveCfg = Release|Any CPU
 		{506CA0C9-AAA5-4852-B43C-87B52FF7C87C}.Release|x86.Build.0 = Release|Any CPU
+		{D82733F6-5541-4733-97E7-162B246233DC}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D82733F6-5541-4733-97E7-162B246233DC}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D82733F6-5541-4733-97E7-162B246233DC}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{D82733F6-5541-4733-97E7-162B246233DC}.Debug|x64.Build.0 = Debug|Any CPU
+		{D82733F6-5541-4733-97E7-162B246233DC}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{D82733F6-5541-4733-97E7-162B246233DC}.Debug|x86.Build.0 = Debug|Any CPU
+		{D82733F6-5541-4733-97E7-162B246233DC}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D82733F6-5541-4733-97E7-162B246233DC}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D82733F6-5541-4733-97E7-162B246233DC}.Release|x64.ActiveCfg = Release|Any CPU
+		{D82733F6-5541-4733-97E7-162B246233DC}.Release|x64.Build.0 = Release|Any CPU
+		{D82733F6-5541-4733-97E7-162B246233DC}.Release|x86.ActiveCfg = Release|Any CPU
+		{D82733F6-5541-4733-97E7-162B246233DC}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
