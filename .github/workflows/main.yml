@@ -1,0 +1,208 @@
+name: CI/CD Pipeline - BankMore
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '9.0.x'
+  DOCKER_REGISTRY: ghcr.io
+  IMAGE_PREFIX: ${{ github.repository_owner }}/bankmore
+
+jobs:
+  # ===== JOB 1: Build e Testes =====
+  build-and-test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Restaurar dependências
+        run: dotnet restore BankMore.sln
+      
+      - name: Build
+        run: dotnet build BankMore.sln --configuration Release --no-restore
+      
+      - name: Executar testes unitários
+        run: dotnet test tests/BankMore.ContaCorrente.Tests/BankMore.ContaCorrente.Tests.csproj --configuration Release --no-build --verbosity normal --logger "trx;LogFileName=test-results.trx"
+      
+      - name: Publicar resultados dos testes
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Test Results
+          path: '**/test-results.trx'
+          reporter: dotnet-trx
+      
+      - name: Gerar relatório de cobertura
+        run: |
+          dotnet test tests/BankMore.ContaCorrente.Tests/BankMore.ContaCorrente.Tests.csproj \
+            --configuration Release \
+            --no-build \
+            --collect:"XPlat Code Coverage" \
+            --results-directory ./coverage
+      
+      - name: Upload cobertura para Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: ./coverage
+          fail_ci_if_error: false
+
+  # ===== JOB 2: Análise de Código =====
+  code-quality:
+    name: Code Quality Analysis
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Para análise completa do SonarCloud
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Restaurar dependências
+        run: dotnet restore BankMore.sln
+      
+      - name: Build para análise
+        run: dotnet build BankMore.sln --configuration Release --no-restore
+
+  # ===== JOB 3: Build Docker Images =====
+  docker-build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [build-and-test]
+    if: github.event_name == 'push'
+    
+    strategy:
+      matrix:
+        service:
+          - name: api-conta
+            dockerfile: src/BankMore.ContaCorrente/Dockerfile
+            context: .
+          - name: api-transferencia
+            dockerfile: src/BankMore.Transferencia/Dockerfile
+            context: .
+          - name: worker-tarifas
+            dockerfile: src/BankMore.Tarifas/Dockerfile
+            context: .
+          - name: web
+            dockerfile: src/BankMore.Web/Dockerfile
+            context: .
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Login no GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Extrair metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Build e Push Docker Image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.service.context }}
+          file: ${{ matrix.service.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # ===== JOB 4: Testes E2E =====
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [docker-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+      
+      - name: Iniciar aplicação com Docker Compose
+        run: |
+          docker-compose up -d
+          sleep 30  # Aguardar serviços iniciarem
+      
+      - name: Verificar saúde dos serviços
+        run: |
+          curl -f http://localhost:5003/health || exit 1
+          curl -f http://localhost:5004/health || exit 1
+          echo "✅ Serviços saudáveis"
+      
+      - name: Executar testes E2E
+        run: |
+          cd tests/BankMore.Web.E2ETests
+          dotnet test --configuration Release --verbosity normal
+      
+      - name: Parar containers
+        if: always()
+        run: docker-compose down
+
+  # ===== JOB 5: Deploy (Condicional) =====
+  deploy:
+    name: Deploy to Environment
+    runs-on: ubuntu-latest
+    needs: [docker-build, e2e-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://bankmore.example.com
+    
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+      
+      - name: Deploy notification
+        run: |
+          echo "🚀 Deployment iniciado para produção"
+          echo "Branch: ${{ github.ref }}"
+          echo "Commit: ${{ github.sha }}"
+      
+      # Aqui você pode adicionar steps reais de deploy:
+      # - Deploy para Azure Container Apps
+      # - Deploy para AWS ECS
+      # - Deploy para Kubernetes
+      # - Deploy para Azure App Service
+      
+      - name: Notificar sucesso
+        if: success()
+        run: echo "✅ Deploy concluído com sucesso!"
