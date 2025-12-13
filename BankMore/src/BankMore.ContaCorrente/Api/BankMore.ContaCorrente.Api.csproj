@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Application\BankMore.ContaCorrente.Application.csproj" />
+    <ProjectReference Include="..\Domain\BankMore.ContaCorrente.Domain.csproj" />
     <ProjectReference Include="..\Infrastructure\BankMore.ContaCorrente.Infrastructure.csproj" />
   </ItemGroup>
 

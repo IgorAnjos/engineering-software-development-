@@ -27,6 +27,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Application\BankMore.Transferencia.Application.csproj" />
+    <ProjectReference Include="..\Domain\BankMore.Transferencia.Domain.csproj" />
     <ProjectReference Include="..\Infrastructure\BankMore.Transferencia.Infrastructure.csproj" />
   </ItemGroup>
 

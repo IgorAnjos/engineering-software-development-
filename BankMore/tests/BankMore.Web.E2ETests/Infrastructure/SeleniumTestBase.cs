@@ -17,7 +17,7 @@ public abstract class SeleniumTestBase : IDisposable
     {
         // Configurações do Chrome
         var options = new ChromeOptions();
-        options.AddArgument("--headless"); // Executar sem interface gráfica
+        // options.AddArgument("--headless"); // Executar sem interface gráfica
         options.AddArgument("--no-sandbox");
         options.AddArgument("--disable-dev-shm-usage");
         options.AddArgument("--disable-gpu");
@@ -30,7 +30,7 @@ public abstract class SeleniumTestBase : IDisposable
         Wait = new WebDriverWait(Driver, TimeSpan.FromSeconds(10));
         
         // URL base da aplicação (deve estar rodando no Docker)
-        BaseUrl = Environment.GetEnvironmentVariable("WEB_BASE_URL") ?? "http://localhost:8080";
+        BaseUrl = Environment.GetEnvironmentVariable("WEB_BASE_URL") ?? "http://localhost:5000";
         
         Driver.Manage().Timeouts().ImplicitWait = TimeSpan.FromSeconds(5);
         Driver.Manage().Timeouts().PageLoad = TimeSpan.FromSeconds(30);
