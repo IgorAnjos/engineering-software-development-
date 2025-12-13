@@ -1,10 +1,10 @@
 using Xunit;
 using Moq;
 using FluentAssertions;
-using BancoDigitalAna.ContaCorrente.Application.Commands;
-using BancoDigitalAna.ContaCorrente.Application.Handlers;
-using BancoDigitalAna.ContaCorrente.Domain.Interfaces;
-using BancoDigitalAna.ContaCorrente.Domain.Entities;
+using BankMore.ContaCorrente.Application.Commands;
+using BankMore.ContaCorrente.Application.Handlers;
+using BankMore.ContaCorrente.Domain.Interfaces;
+using BankMore.ContaCorrente.Domain.Entities;
 
 namespace BancoDigitalAna.ContaCorrente.Tests.Handlers;
 
@@ -13,6 +13,7 @@ public class MovimentacaoHandlerTests
     private readonly Mock<IContaCorrenteRepository> _mockContaRepository;
     private readonly Mock<IMovimentoRepository> _mockMovimentoRepository;
     private readonly Mock<IIdempotenciaRepository> _mockIdempotenciaRepository;
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork;
     private readonly MovimentacaoHandler _handler;
 
     public MovimentacaoHandlerTests()
@@ -20,11 +21,13 @@ public class MovimentacaoHandlerTests
         _mockContaRepository = new Mock<IContaCorrenteRepository>();
         _mockMovimentoRepository = new Mock<IMovimentoRepository>();
         _mockIdempotenciaRepository = new Mock<IIdempotenciaRepository>();
+        _mockUnitOfWork = new Mock<IUnitOfWork>();
         
         _handler = new MovimentacaoHandler(
             _mockContaRepository.Object,
             _mockMovimentoRepository.Object,
-            _mockIdempotenciaRepository.Object
+            _mockIdempotenciaRepository.Object,
+            _mockUnitOfWork.Object
         );
     }
 
@@ -41,10 +44,7 @@ public class MovimentacaoHandlerTests
             Valor = 100.50m
         };
 
-        var conta = new Domain.Entities.ContaCorrente("12345678909", "Teste", "senha", "salt")
-        {
-            Ativo = true
-        };
+        var conta = new BankMore.ContaCorrente.Domain.Entities.ContaCorrente("12345678909", "Teste", "senha", "salt");
 
         _mockIdempotenciaRepository
             .Setup(r => r.ObterPorChaveAsync(command.ChaveIdempotencia))
@@ -61,6 +61,10 @@ public class MovimentacaoHandlerTests
         _mockIdempotenciaRepository
             .Setup(r => r.AdicionarAsync(It.IsAny<Idempotencia>()))
             .Returns(Task.CompletedTask);
+
+        _mockUnitOfWork
+            .Setup(u => u.CommitAsync())
+            .ReturnsAsync(1);
 
         // Act
         var resultado = await _handler.Handle(command, CancellationToken.None);
@@ -84,10 +88,8 @@ public class MovimentacaoHandlerTests
             Valor = 50m
         };
 
-        var conta = new Domain.Entities.ContaCorrente("12345678909", "Teste", "senha", "salt")
-        {
-            Ativo = false // Conta inativa
-        };
+        var conta = new BankMore.ContaCorrente.Domain.Entities.ContaCorrente("12345678909", "Teste", "senha", "salt");
+        conta.Inativar(); // Conta inativa
 
         _mockIdempotenciaRepository
             .Setup(r => r.ObterPorChaveAsync(command.ChaveIdempotencia))
@@ -197,10 +199,7 @@ public class MovimentacaoHandlerTests
             Valor = valor
         };
 
-        var conta = new Domain.Entities.ContaCorrente("12345678909", "Teste", "senha", "salt")
-        {
-            Ativo = true
-        };
+        var conta = new BankMore.ContaCorrente.Domain.Entities.ContaCorrente("12345678909", "Teste", "senha", "salt");
 
         _mockIdempotenciaRepository
             .Setup(r => r.ObterPorChaveAsync(It.IsAny<string>()))

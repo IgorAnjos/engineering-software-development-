@@ -22,9 +22,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\src\BancoDigitalAna.ContaCorrente\Application\BancoDigitalAna.ContaCorrente.Application.csproj" />
-    <ProjectReference Include="..\..\src\BancoDigitalAna.ContaCorrente\Domain\BancoDigitalAna.ContaCorrente.Domain.csproj" />
-    <ProjectReference Include="..\..\src\BancoDigitalAna.ContaCorrente\Infrastructure\BancoDigitalAna.ContaCorrente.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\src\BankMore.ContaCorrente\Application\BankMore.ContaCorrente.Application.csproj" />
+    <ProjectReference Include="..\..\src\BankMore.ContaCorrente\Domain\BankMore.ContaCorrente.Domain.csproj" />
+    <ProjectReference Include="..\..\src\BankMore.ContaCorrente\Infrastructure\BankMore.ContaCorrente.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

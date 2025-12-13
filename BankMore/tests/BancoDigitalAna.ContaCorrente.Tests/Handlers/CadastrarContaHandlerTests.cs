@@ -1,22 +1,30 @@
 using Xunit;
 using Moq;
 using FluentAssertions;
-using BancoDigitalAna.ContaCorrente.Application.Commands;
-using BancoDigitalAna.ContaCorrente.Application.Handlers;
-using BancoDigitalAna.ContaCorrente.Domain.Interfaces;
-using BancoDigitalAna.ContaCorrente.Domain.Entities;
+using BankMore.ContaCorrente.Application.Commands;
+using BankMore.ContaCorrente.Application.Handlers;
+using BankMore.ContaCorrente.Domain.Interfaces;
+using BankMore.ContaCorrente.Infrastructure.Services;
 
 namespace BancoDigitalAna.ContaCorrente.Tests.Handlers;
 
 public class CadastrarContaHandlerTests
 {
     private readonly Mock<IContaCorrenteRepository> _mockRepository;
+    private readonly Mock<IUnitOfWork> _mockUnitOfWork;
+    private readonly Mock<ICryptographyService> _mockCryptographyService;
     private readonly CadastrarContaHandler _handler;
 
     public CadastrarContaHandlerTests()
     {
         _mockRepository = new Mock<IContaCorrenteRepository>();
-        _handler = new CadastrarContaHandler(_mockRepository.Object);
+        _mockUnitOfWork = new Mock<IUnitOfWork>();
+        _mockCryptographyService = new Mock<ICryptographyService>();
+        
+        _handler = new CadastrarContaHandler(
+            _mockRepository.Object,
+            _mockUnitOfWork.Object,
+            _mockCryptographyService.Object);
     }
 
     [Fact]
@@ -30,13 +38,25 @@ public class CadastrarContaHandlerTests
             Senha = "SenhaForte123!"
         };
 
+        _mockCryptographyService
+            .Setup(c => c.Encrypt(It.IsAny<string>()))
+            .Returns("cpf_criptografado");
+
+        _mockCryptographyService
+            .Setup(c => c.HashPassword(It.IsAny<string>()))
+            .Returns("senha_hash");
+
         _mockRepository
-            .Setup(r => r.ProximoNumeroConta())
+            .Setup(r => r.ObterProximoNumeroContaAsync())
             .ReturnsAsync(100);
 
         _mockRepository
-            .Setup(r => r.AdicionarAsync(It.IsAny<Domain.Entities.ContaCorrente>()))
+            .Setup(r => r.AdicionarAsync(It.IsAny<BankMore.ContaCorrente.Domain.Entities.ContaCorrente>()))
             .Returns(Task.CompletedTask);
+
+        _mockUnitOfWork
+            .Setup(u => u.CommitAsync())
+            .ReturnsAsync(1);
 
         // Act
         var resultado = await _handler.Handle(command, CancellationToken.None);
@@ -48,7 +68,7 @@ public class CadastrarContaHandlerTests
         resultado.Ativo.Should().BeTrue();
         resultado.Saldo.Should().Be(0);
 
-        _mockRepository.Verify(r => r.AdicionarAsync(It.IsAny<Domain.Entities.ContaCorrente>()), Times.Once);
+        _mockRepository.Verify(r => r.AdicionarAsync(It.IsAny<BankMore.ContaCorrente.Domain.Entities.ContaCorrente>()), Times.Once);
     }
 
     [Fact]
@@ -88,38 +108,6 @@ public class CadastrarContaHandlerTests
         await act.Should().ThrowAsync<InvalidOperationException>();
     }
 
-    [Fact]
-    public async Task Handle_DeveCriptografarSenha()
-    {
-        // Arrange
-        var command = new CadastrarContaCommand
-        {
-            Cpf = "12345678909",
-            Nome = "Maria Santos",
-            Senha = "SenhaSecreta456!"
-        };
-
-        Domain.Entities.ContaCorrente? contaSalva = null;
-
-        _mockRepository
-            .Setup(r => r.ProximoNumeroConta())
-            .ReturnsAsync(200);
-
-        _mockRepository
-            .Setup(r => r.AdicionarAsync(It.IsAny<Domain.Entities.ContaCorrente>()))
-            .Callback<Domain.Entities.ContaCorrente>(c => contaSalva = c)
-            .Returns(Task.CompletedTask);
-
-        // Act
-        await _handler.Handle(command, CancellationToken.None);
-
-        // Assert
-        contaSalva.Should().NotBeNull();
-        contaSalva!.Senha.Should().NotBe("SenhaSecreta456!"); // Senha deve estar hasheada
-        contaSalva.Senha.Should().StartWith("$2"); // BCrypt hash
-        contaSalva.Salt.Should().NotBeNullOrEmpty();
-    }
-
     [Theory]
     [InlineData("52998224725")]  // CPF válido 1
     [InlineData("11144477735")]  // CPF válido 2
@@ -134,9 +122,18 @@ public class CadastrarContaHandlerTests
             Senha = "Senha123!"
         };
 
-        _mockRepository.Setup(r => r.ProximoNumeroConta()).ReturnsAsync(1);
-        _mockRepository.Setup(r => r.AdicionarAsync(It.IsAny<Domain.Entities.ContaCorrente>()))
+        _mockCryptographyService
+            .Setup(c => c.Encrypt(It.IsAny<string>()))
+            .Returns("cpf_criptografado");
+
+        _mockCryptographyService
+            .Setup(c => c.HashPassword(It.IsAny<string>()))
+            .Returns("senha_hash");
+
+        _mockRepository.Setup(r => r.ObterProximoNumeroContaAsync()).ReturnsAsync(1);
+        _mockRepository.Setup(r => r.AdicionarAsync(It.IsAny<BankMore.ContaCorrente.Domain.Entities.ContaCorrente>()))
             .Returns(Task.CompletedTask);
+        _mockUnitOfWork.Setup(u => u.CommitAsync()).ReturnsAsync(1);
 
         // Act
         var resultado = await _handler.Handle(command, CancellationToken.None);

@@ -18,4 +18,8 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\BankMore.Transferencia\Domain\BankMore.Transferencia.Domain.csproj" />
+  </ItemGroup>
+
 </Project>
