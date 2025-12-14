@@ -9,8 +9,10 @@ on:
 
 env:
   DOTNET_VERSION: '9.0.x'
-  DOCKER_REGISTRY: ghcr.io
-  IMAGE_PREFIX: ${{ github.repository_owner }}/bankmore
+  DOCKER_REGISTRY_GHCR: ghcr.io
+  DOCKER_REGISTRY_HUB: docker.io
+  IMAGE_PREFIX_GHCR: ${{ github.repository_owner }}/bankmore
+  IMAGE_PREFIX_HUB: ${{ secrets.DOCKERHUB_USERNAME }}/bankmore
 
 jobs:
   # ===== JOB 1: Build e Testes =====
@@ -112,15 +114,23 @@ jobs:
       - name: Login no GitHub Container Registry
         uses: docker/login-action@v3
         with:
-          registry: ${{ env.DOCKER_REGISTRY }}
+          registry: ${{ env.DOCKER_REGISTRY_GHCR }}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       
-      - name: Extrair metadata
-        id: meta
+      - name: Login no Docker Hub
+        uses: docker/login-action@v3
+        if: secrets.DOCKERHUB_USERNAME != '' && secrets.DOCKERHUB_TOKEN != ''
+        with:
+          registry: ${{ env.DOCKER_REGISTRY_HUB }}
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      
+      - name: Extrair metadata para GHCR
+        id: meta-ghcr
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ env.IMAGE_PREFIX }}-${{ matrix.service.name }}
+          images: ${{ env.DOCKER_REGISTRY_GHCR }}/${{ env.IMAGE_PREFIX_GHCR }}-${{ matrix.service.name }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -129,14 +139,29 @@ jobs:
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
       
-      - name: Build e Push Docker Image
+      - name: Extrair metadata para Docker Hub
+        id: meta-hub
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKER_REGISTRY_HUB }}/${{ env.IMAGE_PREFIX_HUB }}-${{ matrix.service.name }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+      
+      - name: Build e Push para GHCR e Docker Hub
         uses: docker/build-push-action@v5
         with:
           context: ${{ matrix.service.context }}
           file: ${{ matrix.service.dockerfile }}
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: |
+            ${{ steps.meta-ghcr.outputs.tags }}
+            ${{ steps.meta-hub.outputs.tags }}
+          labels: ${{ steps.meta-ghcr.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
